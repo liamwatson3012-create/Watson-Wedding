@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Favignana — Wedding Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-puBpdR0798OZvTTbP4A8Ix/l+A4dHDD0DGqYW6RQ+9jxkRFclaxxQb/SJAWZfWAkuyeQUytO7+7N4QKrDh+drA==" crossorigin=""/>
+<style>
+  :root{
+    --ink:#3C4043;
+    --ink-soft:#5F6368;
+    --bg-app:#EFF2F0;
+    --card:#FFFFFF;
+    --coral:#E8544A;
+    --blue:#2E7BF6;
+    --shadow: 0 8px 24px rgba(60,64,67,0.16);
+    --shadow-soft: 0 2px 8px rgba(60,64,67,0.15);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: var(--bg-app);
+    color:var(--ink);
+    font-family:'Quicksand', sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  h1,h2,h3{font-family:'Baloo 2', sans-serif; letter-spacing:0.01em; margin:0;}
+  .wrap{max-width:720px; margin:0 auto; padding-bottom: calc(48px + var(--safe-bottom));}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    position:relative;
+    padding: calc(22px + var(--safe-top)) 24px 22px;
+    text-align:center;
+    color:var(--ink);
+    overflow:hidden;
+    background: linear-gradient(180deg, #DDEEF5, var(--bg-app) 92%);
+  }
+  .logo-pin{ width:52px; height:52px; margin:0 auto 8px; }
+  .eyebrow{
+    font-family:'Baloo 2', sans-serif;
+    font-size:12px; font-weight:600; letter-spacing:0.18em;
+    text-transform:uppercase; color:var(--ink-soft); margin-bottom:2px;
+  }
+  .hero h1{ font-size:clamp(30px, 9vw, 44px); font-weight:700; color:var(--ink); line-height:1.05; }
+  .hero .names{ font-family:'Baloo 2', sans-serif; font-weight:600; font-size:clamp(18px,5vw,22px); color:var(--coral); margin-top:8px; }
+  .hero .date{ margin-top:4px; font-size:13px; font-weight:600; letter-spacing:0.06em; color:var(--ink-soft); text-transform:uppercase; }
+  .hero .tagline{ margin-top:12px; font-size:14px; color:var(--ink-soft); max-width:420px; margin-inline:auto; }
+
+  /* ---------- FILTERS ---------- */
+  .filters{ display:flex; gap:8px; overflow-x:auto; padding: 4px 18px 16px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .filters::-webkit-scrollbar{display:none;}
+  .chip{
+    flex:0 0 auto; display:flex; align-items:center; gap:7px;
+    background:var(--card); border:none; color:var(--ink);
+    padding:9px 14px; border-radius:999px;
+    font-family:'Quicksand', sans-serif; font-weight:700; font-size:13.5px;
+    cursor:pointer; box-shadow: var(--shadow-soft);
+    transition: transform .12s ease, background .15s ease, color .15s ease;
+    -webkit-tap-highlight-color: transparent; white-space:nowrap;
+  }
+  .chip .dot{width:9px; height:9px; border-radius:50%; display:inline-block; background:var(--chip-color, var(--coral));}
+  .chip[aria-pressed="true"]{ background: var(--chip-color, var(--coral)); color:#fff; }
+  .chip[aria-pressed="true"] .dot{ background:#fff; }
+  .chip:active{ transform: scale(0.94); }
+
+  /* ---------- MAP ---------- */
+  .map-shell{
+    position:relative;
+    margin: 4px 14px 18px;
+    border-radius:20px;
+    box-shadow: var(--shadow);
+    background: var(--card);
+    padding:8px;
+  }
+  .map-wrap{
+    position:relative;
+    width:100%;
+    aspect-ratio: 1 / 1.12;
+    border-radius:14px;
+    overflow:hidden;
+  }
+  #map{ position:absolute; inset:0; width:100%; height:100%; }
+  .map-fallback{
+    position:absolute; inset:0;
+    display:none;
+    align-items:center; justify-content:center;
+    text-align:center;
+    background: linear-gradient(180deg,#EAF3F7,#DCEAF0);
+    padding:28px;
+    font-size:14px;
+    color:var(--ink-soft);
+    line-height:1.6;
+  }
+  .map-fallback strong{ display:block; color:var(--ink); font-family:'Baloo 2',sans-serif; font-size:17px; margin-bottom:6px; }
+  .map-fallback code{ background:#fff; padding:2px 6px; border-radius:5px; font-size:12.5px; }
+
+  .map-hint{ text-align:center; font-size:12.5px; color:var(--ink-soft); padding: 2px 20px 6px; letter-spacing:0.02em; }
+
+  /* ---------- SECTIONS ---------- */
+  section.panel{
+    background:var(--card); border-radius:18px; margin: 18px 14px; padding:22px 20px 26px;
+    box-shadow: var(--shadow);
+  }
+  .panel h2{ font-size:21px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+  .panel h2 .rule{ flex:1; height:2px; background:#EEEEEE; border-radius:2px; }
+  .panel .sub{ font-size:13px; color:var(--ink-soft); margin-bottom:16px; }
+
+  .faq-item{ border-bottom:1px solid #F0F0EE; }
+  .faq-item:last-child{ border-bottom:none; }
+  .faq-q{
+    width:100%; text-align:left; background:none; border:none;
+    font-family:'Quicksand', sans-serif; font-weight:700; font-size:15.5px; color:var(--ink);
+    padding:14px 4px; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer;
+  }
+  .faq-q .plus{ font-size:20px; color:var(--blue); transition: transform .2s ease; flex:0 0 auto; }
+  .faq-item[data-open="true"] .plus{ transform: rotate(45deg); }
+  .faq-a{ max-height:0; overflow:hidden; transition: max-height .25s ease; font-size:14.5px; line-height:1.55; color:var(--ink-soft); padding:0 4px; }
+  .faq-item[data-open="true"] .faq-a{ padding-bottom:14px; }
+
+  footer.note{ text-align:center; color:var(--ink-soft); font-size:12.5px; padding: 10px 30px 20px; line-height:1.6; }
+
+  /* ---------- BOTTOM SHEET ---------- */
+  .backdrop{
+    position:fixed; inset:0; background:rgba(30,35,35,0.4);
+    opacity:0; pointer-events:none; transition: opacity .22s ease; z-index:40;
+  }
+  .backdrop.show{ opacity:1; pointer-events:auto; }
+  .sheet{
+    position:fixed; left:0; right:0; bottom:0; max-width:720px; margin:0 auto;
+    background:var(--card); border-radius:22px 22px 0 0;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.25);
+    transform: translateY(105%);
+    transition: transform .32s cubic-bezier(.32,.72,.35,1);
+    z-index:41; padding: 10px 22px calc(26px + var(--safe-bottom));
+    max-height:78vh; overflow-y:auto;
+  }
+  .sheet.show{ transform:translateY(0); }
+  .sheet-handle{ width:42px; height:5px; border-radius:3px; background:#E3E3E0; margin: 6px auto 14px; }
+  .sheet-icon{
+    width:46px; height:46px; border-radius:50% 50% 50% 4px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:21px; color:#fff;
+    background: var(--pin-color, var(--coral));
+    border:2.5px solid #fff; box-shadow: var(--shadow-soft); margin-bottom:12px;
+  }
+  .sheet-tag{
+    display:inline-block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em;
+    color:#fff; background:var(--pin-color, var(--coral)); padding:4px 10px; border-radius:999px; margin-bottom:8px;
+  }
+  .sheet h3{ font-size:22px; font-weight:700; margin-bottom:8px; color:var(--ink); }
+  .sheet p{ font-size:14.5px; line-height:1.6; margin:0 0 10px; color:var(--ink-soft);}
+  .sheet .tip{ font-size:13.5px; background:#F4F8FE; border-left:3px solid var(--blue); padding:10px 12px; border-radius:8px; margin-top:8px; color:var(--ink); }
+  .sheet-actions{ display:flex; gap:10px; margin-top:16px; }
+  .btn{
+    flex:1; text-align:center; padding:12px 14px; border-radius:12px;
+    font-family:'Quicksand', sans-serif; font-weight:700; font-size:14px;
+    text-decoration:none; border:none; cursor:pointer;
+  }
+  .btn.primary{ background:var(--blue); color:#fff; }
+  .btn.ghost{ background:#F1F1EF; color:var(--ink); border:none; }
+  .close-x{
+    position:absolute; top:14px; right:16px; width:32px; height:32px; border-radius:50%;
+    border:none; background:#F1F1EF; font-size:16px; color:var(--ink); cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <svg class="logo-pin" viewBox="0 0 100 100">
+      <ellipse cx="50" cy="88" rx="18" ry="5" fill="rgba(60,64,67,0.15)"/>
+      <path d="M50,8 C29,8 14,24 14,44 C14,68 50,92 50,92 C50,92 86,68 86,44 C86,24 71,8 50,8 Z" fill="#E8544A"/>
+      <circle cx="50" cy="44" r="18" fill="#fff"/>
+      <path d="M50,36 C47,32 41,33 40,39 C39,45 50,54 50,54 C50,54 61,45 60,39 C59,33 53,32 50,36 Z" fill="#E8544A"/>
+    </svg>
+    <div class="eyebrow">Isola di Favignana · Egadi Islands</div>
+    <h1>Favignana</h1>
+    <div class="names" id="coupleNames">Edit names in CONFIG ▸</div>
+    <div class="date" id="weddingDate">Edit date in CONFIG</div>
+    <p class="tagline">Your guide to the island — where to swim, where to wander, and where to find us for the big day.</p>
+  </header>
+
+  <nav class="filters" id="filters" aria-label="Filter points of interest by type"></nav>
+
+  <div class="map-shell">
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="map-fallback" id="mapFallback">
+        <div>
+          <strong>Map couldn't load</strong>
+          This map needs an internet connection to fetch OpenStreetMap tiles.
+          Check your connection and reload the page.
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="map-hint">Pinch, scroll or use the on-map controls to zoom · tap a marker for details</p>
+
+  <section class="panel">
+    <h2>Good to Know <span class="rule"></span></h2>
+    <p class="sub">Everything guests keep asking — answered once and for all.</p>
+    <div id="faqList"></div>
+  </section>
+
+  <footer class="note">
+    Made for our island wedding, with a little help from the map.<br>
+    Questions we haven't covered? Just ask us directly.
+  </footer>
+</div>
+
+<div class="backdrop" id="backdrop"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <button class="close-x" id="closeSheet" aria-label="Close">✕</button>
+  <div class="sheet-handle"></div>
+  <div id="sheetContent"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-BwHfrr4c9kmRkLw6iXFdzcdWV/PGkVgiIyIWLLlTSXzWQzxuSg4DiQUCpauz/EWjgk5TYQqX/kvn9pG1NpYfqg==" crossorigin=""></script>
+<script>
+/* =========================================================
+   ✏️ EDIT ME — wedding basics
+   ========================================================= */
+const WEDDING_CONFIG = {
+  names: "Add Names Here",
+  date: "Add Date Here",
+};
+
+/* =========================================================
+   ✏️ EDIT ME — categories (color + icon shown as filter chips
+   and used to colour each map pin)
+   ========================================================= */
+const CATEGORIES = [
+  { id: "wedding", label: "Wedding Events", icon: "💍", color: "#E8544A" },
+  { id: "beach",   label: "Beaches & Coves", icon: "🏖️", color: "#2FA7C9" },
+  { id: "history", label: "History & Landmarks", icon: "🏰", color: "#C79A3B" },
+  { id: "nature",  label: "Nature & Adventure", icon: "🥾", color: "#5AA24A" },
+  { id: "food",    label: "Food & Drink", icon: "🍹", color: "#E08A2E" },
+];
+
+/* =========================================================
+   ✏️ EDIT ME — every point of interest, with real lat/lng.
+   mapsUrl is a real Google Maps link guests can tap for
+   turn-by-turn directions.
+   ========================================================= */
+const POIS = [
+  {
+    id: "camparia", category: "wedding", special: true, icon: "💍",
+    name: "Camparia — The Main Event", lat: 37.9314405, lng: 12.3266172,
+    blurb: "Our ceremony and reception, held inside the beautifully restored 19th-century Tonnara Florio — soaring stone arches, a former tuna cannery turned into one of Sicily's most striking wedding venues, right on the water in the heart of town.",
+    tip: "Add your ceremony and reception timings and dress code here.",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=37.9314405,12.3266172&query_place_id=ChIJUW-zGjvjGxMRrueEemYInQU"
+  },
+  {
+    id: "welcome", category: "wedding", special: true, icon: "🎉",
+    name: "Sea Club — Welcome Beach Party", lat: 37.9347897, lng: 12.3337623,
+    blurb: "The night before it all begins: a relaxed, barefoot beach party at Sea Club, right on the water just a few minutes from the port. Come say hello, grab a drink and watch the sunset with us.",
+    tip: "Add your start time here — casual, beach-appropriate dress.",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=37.9347897,12.3337623&query_place_id=ChIJn47Yh1rjGxMRCW6t0XCj5Sw"
+  },
+  {
+    id: "port", category: "history", icon: "⛴️",
+    name: "Favignana Port", lat: 37.9334004, lng: 12.3253419,
+    blurb: "The island's front door. Ferries and hydrofoils from Trapani dock right here, and it's where most guests will get their first look at the island.",
+    tip: "Arriving by ferry? This is your landing point — the town centre is a two-minute walk.",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=37.9334004,12.3253419&query_place_id=ChIJ7cTe7uzjGxMRrCvaMyemhUM"
+  },
+  {
+    id: "tonnara", category: "history", icon: "🏛️",
+    name: "Ex Stabilimento Florio", lat: 37.929519, lng: 12.323635,
+    blurb: "A grand former tuna cannery turned museum, telling the story of the Florio family who once ran the island's entire tuna-fishing empire. Beautiful building even if you skip the exhibits.",
+    tip: "Worth a slow wander in the shade during the hottest part of the day.",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=37.929519,12.323635&query_place_id=ChIJ3817rfLjGxMRinPhzsMCBH4"
+  },
+  {
+    id: "castello", category: "history", icon: "🏰",
+    name: "Castello di Santa Caterina", lat: 37.927149, lng: 12.31203,
+    blurb: "A crumbling hilltop fort with roots going back to Saracen watchtowers, later rebuilt by the Normans. The climb is steep but the 360° views over the whole archipelago are the reward.",
+    tip: "Go for sunset, wear proper shoes, and bring water — there's nothing up there but view.",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=37.927149,12.31203&query_place_id=ChIJS72t-YnjGxMRnLlob1zZEYA"
+  },
+  {
+    id: "calarossa", category: "beach", icon: "🌊",
+    name: "Cala Rossa", lat: 37.9220325, lng: 12.3626303,
+    blurb: "The island's most photographed cove — dramatic tuff cliffs and impossibly turquoise water. Ancient legend claims it earned its name ('Red Cove') from a bloody naval battle fought just offshore.",
+    tip: "Rocky, not sandy — pack water shoes. Arrive early to beat the crowds.",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=37.9220325,12.3626303&query_place_id=ChIJj-j6JbvhGxMRSXUBPAQiLCM"
+  },
+  {
+    id: "buemarino", category: "beach", icon: "🐚",
+    name: "Cala Bue Marino", lat: 37.917304, lng: 12.3698576,
+    blurb: "A quieter, wilder cove tucked into old quarry caves, with some of the clearest water on the island and plenty of fish to spot while snorkelling.",
+    tip: "Grab a tuna sandwich from the van at the top before you climb down.",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=37.917304,12.3698576&query_place_id=ChIJyR_yeDXhGxMR11oE12Mmopw"
+  },
+  {
+    id: "burrone", category: "beach", icon: "🏖️",
+    name: "Lido Burrone", lat: 37.9184235, lng: 12.3383789,
+    blurb: "The easiest sandy beach on the island, with sunbeds, a beach bar and shallow, calm water — the go-to for a relaxed afternoon.",
+    tip: "About 10 minutes by bike from the port — the most convenient beach for a quick dip.",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=37.9184235,12.3383789&query_place_id=ChIJsX6tg_jjGxMRT0lFZbaYqRw"
+  },
+  {
+    id: "calaazzurra", category: "beach", icon: "💦",
+    name: "Cala Azzurra", lat: 37.9090733, lng: 12.3617314,
+    blurb: "Small, sandy and often called the island's best swimming spot, with shallow crystal-clear water that's ideal for floating around for an hour (or three).",
+    tip: "Tiny and popular — come at sunrise if you want it to yourself.",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=37.9090733,12.3617314&query_place_id=ChIJsTzcErHmGxMRYabryb8p6-g"
+  },
+  {
+    id: "calarotonda", category: "beach", icon: "🍸",
+    name: "Cala Rotonda", lat: 37.9250566, lng: 12.2829033,
+    blurb: "A remote pebble cove on the wild west side, with a laid-back beach bar serving cocktails right at the water's edge. Far fewer crowds than the east-side beaches.",
+    tip: "Best sunset spot on this side of the island — bring beach shoes for the pebbles.",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=37.9250566,12.2829033&query_place_id=ChIJ0bIojWHjGxMR0QsoNyvR4t8"
+  },
+  {
+    id: "puntasottile", category: "nature", icon: "🗼",
+    name: "Punta Sottile Lighthouse", lat: 37.9350502, lng: 12.2723442,
+    blurb: "The island's westernmost tip, marked by a lonely working lighthouse looking straight out at open sea — properly end-of-the-world scenery.",
+    tip: "A great, quiet spot for an evening walk away from the busier beaches.",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=37.9350502,12.2723442&query_place_id=ChIJhy3QqFzjGxMREpJwk92eukM"
+  },
+  {
+    id: "faraglione", category: "nature", icon: "🪨",
+    name: "Punta Faraglione", lat: 37.9547728, lng: 12.307595,
+    blurb: "A wild, barren sea stack on the island's north tip, reached along a rough trail — one of the least-visited and most dramatic corners of Favignana.",
+    tip: "Rough track — a scooter or e-bike gets you most of the way, then it's a short scramble.",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=37.9547728,12.307595&query_place_id=ChIJDULmIq_jGxMRC1N9I4H-59w"
+  },
+  {
+    id: "piazza", category: "food", icon: "🍋",
+    name: "Piazza Madrice", lat: 37.9316945, lng: 12.328838,
+    blurb: "The island's social heart — narrow streets opening onto a lively square full of café terraces. Perfect for an evening granita or a pre-dinner aperitivo.",
+    tip: "Try the granita with brioche, and don't skip the tuna-based specialities.",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=37.9316945,12.328838&query_place_id=ChIJTcbf1u3jGxMR96kOoZ9dfLY"
+  }
+];
+
+/* =========================================================
+   ✏️ EDIT ME — FAQ content
+   ========================================================= */
+const FAQS = [
+  {
+    q: "How do we actually get to Favignana?",
+    a: "Fly into Trapani-Birgi or Palermo, then take a ferry or hydrofoil from Trapani port — the crossing takes about 20–50 minutes depending on the boat. We'll share exact timetables closer to the date, but it's worth booking your own ticket in advance in peak season."
+  },
+  {
+    q: "Where should we stay?",
+    a: "Most guests stay right on Favignana itself, within walking or biking distance of the port and town — that's the easiest option. Add your preferred hotels, B&Bs or a group booking link here."
+  },
+  {
+    q: "What should we wear?",
+    a: "Think 'elegant island' — light fabrics, comfortable shoes for cobbled streets, and something you don't mind a sea breeze getting into. Add your specific dress code and any beach-formal notes here."
+  },
+  {
+    q: "Where exactly is the wedding?",
+    a: "The ceremony and reception are both at Camparia, inside the historic Tonnara Florio right in Favignana town — look for the 💍 pin on the map above for the exact location and directions. The night before, we're all meeting at Sea Club for a casual welcome beach party — that's the 🎉 pin."
+  },
+  {
+    q: "How do we get around the island?",
+    a: "Favignana is small, flat on one side and hilly on the other. Renting a bike or electric scooter for a couple of days is the easiest way to reach the beaches — cars are limited and mostly unnecessary."
+  },
+  {
+    q: "What's the food situation?",
+    a: "Tuna, tuna, and more tuna — it's the island's specialty, served everything from tartare to pasta. If you have dietary restrictions, let us know and we'll make sure the venue can accommodate you."
+  },
+  {
+    q: "Are kids welcome?",
+    a: "Add your policy here — e.g. 'Of course! We'd love to have the little ones celebrate with us' or details on adult-only portions of the celebration."
+  },
+  {
+    q: "Gifts?",
+    a: "Your presence on this island is truly the gift. If you'd still like to give something, add your registry or honeymoon fund details here."
+  },
+  {
+    q: "What's the weather like?",
+    a: "Expect warm, dry Mediterranean weather with strong sun and the occasional breezy day (locals call the wind the 'maestrale'). Pack sunscreen, a hat, and a light layer for the evenings."
+  }
+];
+
+/* =========================================================
+   Rendering — no need to edit below this line
+   ========================================================= */
+const filtersEl = document.getElementById('filters');
+const faqList = document.getElementById('faqList');
+document.getElementById('coupleNames').textContent = WEDDING_CONFIG.names;
+document.getElementById('weddingDate').textContent = WEDDING_CONFIG.date;
+
+const catById = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
+let active = new Set(CATEGORIES.map(c => c.id));
+let markerEntries = []; // filled in by initMap: [{poi, marker}]
+
+function renderFilters(){
+  filtersEl.innerHTML = '';
+  const allChip = document.createElement('button');
+  allChip.className = 'chip';
+  allChip.textContent = '✨ All';
+  allChip.setAttribute('aria-pressed', active.size === CATEGORIES.length);
+  allChip.style.setProperty('--chip-color', '#3C4043');
+  allChip.addEventListener('click', () => {
+    active = new Set(CATEGORIES.map(c => c.id));
+    renderFilters(); applyMarkerFilter();
+  });
+  filtersEl.appendChild(allChip);
+
+  CATEGORIES.forEach(cat => {
+    const chip = document.createElement('button');
+    chip.className = 'chip';
+    chip.style.setProperty('--chip-color', cat.color);
+    chip.setAttribute('aria-pressed', active.has(cat.id));
+    chip.innerHTML = `<span>${cat.icon}</span><span>${cat.label}</span>`;
+    chip.addEventListener('click', () => {
+      if (active.has(cat.id)) { active.delete(cat.id); } else { active.add(cat.id); }
+      renderFilters(); applyMarkerFilter();
+    });
+    filtersEl.appendChild(chip);
+  });
+}
+
+function applyMarkerFilter(){
+  markerEntries.forEach(({ poi, marker }) => {
+    const shouldShow = active.has(poi.category);
+    const onMap = window.__lmap.hasLayer(marker);
+    if (shouldShow && !onMap) marker.addTo(window.__lmap);
+    if (!shouldShow && onMap) window.__lmap.removeLayer(marker);
+  });
+}
+
+function renderFaqs(){
+  faqList.innerHTML = '';
+  FAQS.forEach((item) => {
+    const div = document.createElement('div');
+    div.className = 'faq-item';
+    div.dataset.open = 'false';
+    div.innerHTML = `
+      <button class="faq-q" aria-expanded="false">
+        <span>${item.q}</span>
+        <span class="plus">+</span>
+      </button>
+      <div class="faq-a"><p style="margin:0 0 12px;">${item.a}</p></div>
+    `;
+    const qBtn = div.querySelector('.faq-q');
+    const aDiv = div.querySelector('.faq-a');
+    qBtn.addEventListener('click', () => {
+      const isOpen = div.dataset.open === 'true';
+      div.dataset.open = isOpen ? 'false' : 'true';
+      qBtn.setAttribute('aria-expanded', String(!isOpen));
+      aDiv.style.maxHeight = isOpen ? '0px' : aDiv.scrollHeight + 20 + 'px';
+    });
+    faqList.appendChild(div);
+  });
+}
+
+/* ---------- Bottom sheet ---------- */
+const sheet = document.getElementById('sheet');
+const backdrop = document.getElementById('backdrop');
+const sheetContent = document.getElementById('sheetContent');
+let lastFocused = null;
+
+function openSheet(poi){
+  const cat = catById[poi.category];
+  lastFocused = document.activeElement;
+  sheetContent.innerHTML = `
+    <div class="sheet-icon" style="--pin-color:${cat.color}">${poi.icon}</div>
+    <span class="sheet-tag" style="--pin-color:${cat.color}; background:${cat.color}">${cat.label}</span>
+    <h3 id="sheetTitle">${poi.name}</h3>
+    <p>${poi.blurb}</p>
+    ${poi.tip ? `<div class="tip">💡 ${poi.tip}</div>` : ''}
+    <div class="sheet-actions">
+      ${poi.mapsUrl ? `<a class="btn primary" href="${poi.mapsUrl}" target="_blank" rel="noopener">Get Directions</a>` : `<span class="btn primary" style="opacity:.55; cursor:default;">Details in invite</span>`}
+      <button class="btn ghost" id="sheetCloseBtn">Close</button>
+    </div>
+  `;
+  document.getElementById('sheetCloseBtn').addEventListener('click', closeSheet);
+  sheet.classList.add('show');
+  backdrop.classList.add('show');
+  document.getElementById('closeSheet').focus();
+}
+function closeSheet(){
+  sheet.classList.remove('show');
+  backdrop.classList.remove('show');
+  if (lastFocused) lastFocused.focus();
+}
+document.getElementById('closeSheet').addEventListener('click', closeSheet);
+backdrop.addEventListener('click', closeSheet);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+
+renderFilters();
+renderFaqs();
+
+/* =========================================================
+   Map — real OpenStreetMap tiles via Leaflet, no API key needed
+   ========================================================= */
+function pinIcon(cat, special){
+  const w = special ? 44 : 34, h = special ? 56 : 44;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 34 44'>
+    <path d='M17 0C7.6 0 0 7.6 0 17c0 12.6 17 27 17 27s17-14.4 17-27C34 7.6 26.4 0 17 0z' fill='${cat.color}' stroke='#ffffff' stroke-width='2'/>
+    <circle cx='17' cy='17' r='11.5' fill='#ffffff'/>
+    <text x='17' y='22.5' font-size='15' text-anchor='middle'>${cat.icon}</text>
+  </svg>`;
+  return L.icon({
+    iconUrl: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    iconSize: [w, h],
+    iconAnchor: [w / 2, h],
+    popupAnchor: [0, -h]
+  });
+}
+
+function initMap(){
+  const map = L.map('map', {
+    center: [37.9296, 12.3277],
+    zoom: 14,
+    minZoom: 12,
+    maxZoom: 19,
+    zoomControl: true
+  });
+  window.__lmap = map;
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  markerEntries = POIS.map(poi => {
+    const cat = catById[poi.category];
+    const marker = L.marker([poi.lat, poi.lng], {
+      icon: pinIcon(cat, poi.special),
+      title: poi.name
+    });
+    marker.on('click', () => openSheet(poi));
+    marker.addTo(map);
+    return { poi, marker };
+  });
+  applyMarkerFilter();
+}
+
+try {
+  initMap();
+} catch (err){
+  console.error(err);
+  document.getElementById('mapFallback').style.display = 'flex';
+}
+</script>
+
+</body>
+</html>
